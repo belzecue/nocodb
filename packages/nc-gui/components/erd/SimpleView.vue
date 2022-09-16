@@ -24,7 +24,8 @@ const { metasWithIdAsKey } = useMetas()
 
 const { $destroy, fitView } = useVueFlow()
 
-const initialNodes = ref<Pick<Node, 'id' | 'data' | 'type'>[]>([])
+const isTransitioning = ref(true)
+
 const nodes = ref<Node[]>([])
 const edges = ref<Edge[]>([])
 
@@ -37,7 +38,7 @@ const initDagre = () => {
 }
 
 const populateInitialNodes = () => {
-  initialNodes.value = tables.flatMap((table) => {
+  nodes.value = tables.flatMap((table) => {
     if (!table.id) return []
 
     const columns =
@@ -52,6 +53,7 @@ const populateInitialNodes = () => {
         id: table.id,
         data: { ...metasWithIdAsKey.value[table.id], showPkAndFk: config.showPkAndFk, showAllColumns: config.showAllColumns },
         type: 'custom',
+        position: { x: 0, y: 0 },
       },
     ]
   })
@@ -168,7 +170,7 @@ const layoutNodes = () => {
 
   dagre.layout(dagreGraph)
 
-  nodes.value = initialNodes.value.flatMap((node) => {
+  nodes.value = nodes.value.flatMap((node) => {
     const nodeWithPosition = dagreGraph.node(node.id)
 
     if (!nodeWithPosition) return []
@@ -186,7 +188,9 @@ const init = (reset = false) => {
   populateEdges()
   layoutNodes()
 
-  setTimeout(() => fitView({ duration: 300 }))
+  if (reset) {
+    setTimeout(() => fitView({ duration: 300 }))
+  }
 }
 
 initDagre()
@@ -196,33 +200,41 @@ onBeforeMount(init)
 onScopeDispose($destroy)
 
 watch([() => tables, () => config], () => init(true), { deep: true, flush: 'pre' })
+
+useEventListener('transitionend', () => {
+  isTransitioning.value = false
+})
 </script>
 
 <template>
-  <VueFlow :nodes="nodes" :edges="edges" :fit-view-on-init="true" :elevate-edges-on-select="true">
-    <Controls class="!left-auto right-2 !top-3.5 !bottom-auto" :show-fit-view="false" :show-interactive="false" />
+  <Transition name="layout" mode="in-out">
+    <VueFlow v-if="!isTransitioning" :nodes="nodes" :edges="edges" fit-view-on-init elevate-edges-on-select>
+      <Controls class="!left-auto right-2 !top-3.5 !bottom-auto" :show-fit-view="false" :show-interactive="false" />
 
-    <template #node-custom="props">
-      <TableNode :data="props.data" />
-    </template>
+      <template #node-custom="props">
+        <TableNode :data="props.data" />
+      </template>
 
-    <template #edge-custom="props">
-      <RelationEdge v-bind="props" />
-    </template>
-    <Background />
-    <div
-      v-if="!config.singleTableMode"
-      class="absolute bottom-0 right-0 flex flex-col text-xs bg-white px-2 py-1 border-1 rounded-md border-gray-200"
-      style="font-size: 0.6rem"
-    >
-      <div class="flex flex-row items-center space-x-1 border-b-1 pb-1 border-gray-100">
-        <MdiTableLarge class="text-primary" />
-        <div>{{ $t('objects.table') }}</div>
+      <template #edge-custom="props">
+        <RelationEdge v-bind="props" />
+      </template>
+
+      <Background />
+
+      <div
+        v-if="!config.singleTableMode"
+        class="absolute bottom-0 right-0 flex flex-col text-xs bg-white px-2 py-1 border-1 rounded-md border-gray-200"
+        style="font-size: 0.6rem"
+      >
+        <div class="flex flex-row items-center space-x-1 border-b-1 pb-1 border-gray-100">
+          <MdiTableLarge class="text-primary" />
+          <div>{{ $t('objects.table') }}</div>
+        </div>
+        <div class="flex flex-row items-center space-x-1 pt-1">
+          <MdiEyeCircleOutline class="text-primary" />
+          <div>{{ $t('objects.sqlVIew') }}</div>
+        </div>
       </div>
-      <div class="flex flex-row items-center space-x-1 pt-1">
-        <MdiEyeCircleOutline class="text-primary" />
-        <div>{{ $t('objects.sqlVIew') }}</div>
-      </div>
-    </div>
-  </VueFlow>
+    </VueFlow>
+  </Transition>
 </template>

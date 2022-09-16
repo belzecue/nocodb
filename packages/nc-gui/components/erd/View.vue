@@ -9,7 +9,6 @@ const { tables: projectTables } = useProject()
 const { metas, getMeta } = useMetas()
 
 let isLoading = $ref(true)
-const erdKey = ref(0)
 const showAdvancedOptions = ref(false)
 
 const config = ref({
@@ -87,21 +86,21 @@ watch(
       >
         <div class="flex flex-row items-center">
           <a-checkbox v-model:checked="config.showAllColumns" v-e="['c:erd:showAllColumns']" />
-          <span class="ml-2 select-none" style="font-size: 0.65rem" @dblclick="showAdvancedOptions = true">{{
-            $t('activity.erd.showColumns')
-          }}</span>
+          <span class="ml-2 select-none text-[0.65rem]" @dblclick="showAdvancedOptions = true">
+            {{ $t('activity.erd.showColumns') }}
+          </span>
         </div>
         <div class="flex flex-row items-center">
           <a-checkbox v-model:checked="config.showPkAndFk" v-e="['c:erd:showPkAndFk']" :disabled="!config.showAllColumns" />
-          <span class="ml-2 select-none" style="font-size: 0.65rem">{{ $t('activity.erd.showPkAndFk') }}</span>
+          <span class="ml-2 select-none text-[0.65rem]">{{ $t('activity.erd.showPkAndFk') }}</span>
         </div>
         <div v-if="!table" class="flex flex-row items-center">
           <a-checkbox v-model:checked="config.showViews" v-e="['c:erd:showViews']" />
-          <span class="ml-2 select-none" style="font-size: 0.65rem">{{ $t('activity.erd.showSqlViews') }}</span>
+          <span class="ml-2 select-none text-[0.65rem]">{{ $t('activity.erd.showSqlViews') }}</span>
         </div>
         <div v-if="!table && showAdvancedOptions" class="flex flex-row items-center">
           <a-checkbox v-model:checked="config.showMMTables" v-e="['c:erd:showMMTables']" />
-          <span class="ml-2 select-none" style="font-size: 0.65rem">{{ $t('activity.erd.showMMTables') }}</span>
+          <span class="ml-2 select-none text-[0.65rem]">{{ $t('activity.erd.showMMTables') }}</span>
         </div>
         <div v-if="showAdvancedOptions" class="flex flex-row items-center">
           <a-checkbox v-model:checked="config.showJunctionTableNames" v-e="['c:erd:showJunctionTableNames']" />
