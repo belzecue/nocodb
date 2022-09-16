@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import type { Edge, Node } from '@braks/vue-flow'
-import { Background, Controls, VueFlow } from '@braks/vue-flow'
+import { Background, Controls, VueFlow, useVueFlow } from '@braks/vue-flow'
 import type { ColumnType, FormulaType, LinkToAnotherRecordType, LookupType, RollupType } from 'nocodb-sdk'
 import { UITypes } from 'nocodb-sdk'
 import dagre from 'dagre'
 import TableNode from './TableNode.vue'
 import RelationEdge from './RelationEdge.vue'
-import MdiView from '~icons/mdi/eye-circle-outline'
-import MdiTableLarge from '~icons/mdi/table-large'
 
 interface Props {
   tables: any[]
@@ -24,32 +22,39 @@ const { tables, config } = defineProps<Props>()
 
 const { metasWithIdAsKey } = useMetas()
 
+const { $destroy, fitView } = useVueFlow()
+
 const initialNodes = ref<Pick<Node, 'id' | 'data' | 'type'>[]>([])
 const nodes = ref<Node[]>([])
 const edges = ref<Edge[]>([])
-const vueFlowKey = ref(0)
 
-const dagreGraph = new dagre.graphlib.Graph()
-dagreGraph.setDefaultEdgeLabel(() => ({}))
+let dagreGraph: dagre.graphlib.Graph
+
+const initDagre = () => {
+  dagreGraph = new dagre.graphlib.Graph()
+  dagreGraph.setDefaultEdgeLabel(() => ({}))
+  dagreGraph.setGraph({ rankdir: 'LR' })
+}
 
 const populateInitialNodes = () => {
-  tables.forEach((table) => {
-    if (!table.id) return
+  initialNodes.value = tables.flatMap((table) => {
+    if (!table.id) return []
 
-    const columns = metasWithIdAsKey.value[table.id].columns!.filter(
-      (col) => config.showAllColumns || (!config.showAllColumns && col.uidt === UITypes.LinkToAnotherRecord),
-    )
+    const columns =
+      metasWithIdAsKey.value[table.id].columns?.filter(
+        (col) => config.showAllColumns || (!config.showAllColumns && col.uidt === UITypes.LinkToAnotherRecord),
+      ) || []
 
     dagreGraph.setNode(table.id, { width: 250, height: 50 * columns.length })
 
-    initialNodes.value.push({
-      id: table.id,
-      data: { ...metasWithIdAsKey.value[table.id], showPkAndFk: config.showPkAndFk, showAllColumns: config.showAllColumns },
-      type: 'custom',
-    })
+    return [
+      {
+        id: table.id,
+        data: { ...metasWithIdAsKey.value[table.id], showPkAndFk: config.showPkAndFk, showAllColumns: config.showAllColumns },
+        type: 'custom',
+      },
+    ]
   })
-
-  dagreGraph.setGraph({ rankdir: 'LR' })
 }
 
 const populateEdges = () => {
@@ -111,14 +116,6 @@ const populateEdges = () => {
 
     if (source !== target) dagreGraph.setEdge(source, target)
 
-    // todo: In the case of one self relation and one has many between 2 tables in only single table view, edges are getting messed up
-    if (source === target) {
-      // rerender after 200ms
-      setTimeout(() => {
-        vueFlowKey.value = 1
-      }, 350)
-    }
-
     return {
       id: `e-${sourceColumnId}-${source}-${targetColumnId}-${target}`,
       source: `${source}`,
@@ -137,6 +134,7 @@ const populateEdges = () => {
 
 const connectNonConnectedNodes = () => {
   const connectedNodes = new Set<string>()
+
   edges.value.forEach((edge) => {
     connectedNodes.add(edge.source)
     connectedNodes.add(edge.target)
@@ -179,15 +177,29 @@ const layoutNodes = () => {
   })
 }
 
-onBeforeMount(() => {
+const init = (reset = false) => {
+  if (reset) {
+    initDagre()
+  }
+
   populateInitialNodes()
   populateEdges()
   layoutNodes()
-})
+
+  setTimeout(() => fitView({ duration: 300 }))
+}
+
+initDagre()
+
+onBeforeMount(init)
+
+onScopeDispose($destroy)
+
+watch([() => tables, () => config], () => init(true), { deep: true, flush: 'pre' })
 </script>
 
 <template>
-  <VueFlow :key="vueFlowKey" :nodes="nodes" :edges="edges" :fit-view-on-init="true" :elevate-edges-on-select="true">
+  <VueFlow :nodes="nodes" :edges="edges" :fit-view-on-init="true" :elevate-edges-on-select="true">
     <Controls class="!left-auto right-2 !top-3.5 !bottom-auto" :show-fit-view="false" :show-interactive="false" />
 
     <template #node-custom="props">
@@ -208,7 +220,7 @@ onBeforeMount(() => {
         <div>{{ $t('objects.table') }}</div>
       </div>
       <div class="flex flex-row items-center space-x-1 pt-1">
-        <MdiView class="text-primary" />
+        <MdiEyeCircleOutline class="text-primary" />
         <div>{{ $t('objects.sqlVIew') }}</div>
       </div>
     </div>
